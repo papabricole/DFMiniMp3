@@ -25,8 +25,7 @@ License along with NeoPixel.  If not, see
 -------------------------------------------------------------------------*/
 #pragma once
 
-enum DfMp3_Error
-{
+enum DfMp3_Error {
     DfMp3_Error_Busy = 1,
     DfMp3_Error_Sleeping,
     DfMp3_Error_SerialWrongStack,
@@ -37,18 +36,14 @@ enum DfMp3_Error
     DfMp3_Error_General = 0xff
 };
 
-
-enum DfMp3_PlaybackMode
-{
+enum DfMp3_PlaybackMode {
     DfMp3_PlaybackMode_Repeat,
     DfMp3_PlaybackMode_FolderRepeat,
     DfMp3_PlaybackMode_SingleRepeat,
     DfMp3_PlaybackMode_Random
 };
 
-
-enum DfMp3_Eq
-{
+enum DfMp3_Eq {
     DfMp3_Eq_Normal,
     DfMp3_Eq_Pop,
     DfMp3_Eq_Rock,
@@ -57,9 +52,7 @@ enum DfMp3_Eq
     DfMp3_Eq_Bass
 };
 
-
-enum DfMp3_PlaySource
-{
+enum DfMp3_PlaySource {
     DfMp3_PlaySource_U,
     DfMp3_PlaySource_Sd,
     DfMp3_PlaySource_Aux,
@@ -67,14 +60,13 @@ enum DfMp3_PlaySource
     DfMp3_PlaySource_Flash
 };
 
-
-template<class T_SERIAL_METHOD, class T_NOTIFICATION_METHOD> class DFMiniMp3
-{
+template <class T_SERIAL_METHOD, class T_NOTIFICATION_METHOD>
+class DFMiniMp3 {
 public:
-    DFMiniMp3(T_SERIAL_METHOD& serial) :
-        _serial(serial),
-        _lastSendSpace(c_msSendSpace),
-        _isOnline(true)
+    DFMiniMp3(T_SERIAL_METHOD& serial)
+        : _serial(serial)
+        , _lastSendSpace(c_msSendSpace)
+        , _isOnline(true)
     {
     }
 
@@ -87,8 +79,7 @@ public:
 
     void loop()
     {
-        while (_serial.available() >= DfMp3_Packet_SIZE)
-        {
+        while (_serial.available() >= DfMp3_Packet_SIZE) {
             listenForReply(0x00);
         }
     }
@@ -147,7 +138,7 @@ public:
         sendPacket(0x06, volume);
     }
 
-    uint8_t getVolume()
+    uint16_t getVolume()
     {
         sendPacket(0x43);
         return listenForReply(0x43);
@@ -189,7 +180,6 @@ public:
         sendPacket(0x11, !!repeat);
     }
 
-
     void setEq(DfMp3_Eq eq)
     {
         sendPacket(0x07, eq);
@@ -200,7 +190,6 @@ public:
         sendPacket(0x44);
         return listenForReply(0x44);
     }
-
 
     void setPlaybackSource(DfMp3_PlaySource source)
     {
@@ -274,8 +263,7 @@ private:
     // 5~6	->	01 01 is argument
     // 7~8	->	checksum = 0 - ( FF+06+0F+00+01+01 )
     // 9	->	EF is end code
-    enum DfMp3_Packet
-    {
+    enum DfMp3_Packet {
         DfMp3_Packet_StartCode,
         DfMp3_Packet_Version,
         DfMp3_Packet_Length,
@@ -289,7 +277,6 @@ private:
         DfMp3_Packet_SIZE
     };
 
-
     T_SERIAL_METHOD& _serial;
     uint32_t _lastSend;
     uint16_t _lastSendSpace;
@@ -297,13 +284,12 @@ private:
 
     void sendPacket(uint8_t command, uint16_t arg = 0, uint16_t sendSpaceNeeded = c_msSendSpace)
     {
-        uint8_t out[DfMp3_Packet_SIZE] = { 0x7E, 0xFF, 06, command, 00, (arg >> 8), (arg & 0x00ff), 00, 00, 0xEF };
+        uint8_t out[DfMp3_Packet_SIZE] = { 0x7E, 0xFF, 06, command, 00, uint8_t(arg >> 8), uint8_t(arg & 0x00ff), 00, 00, 0xEF };
 
         setChecksum(out);
 
         // wait for spacing since last send
-        while (((millis() - _lastSend) < _lastSendSpace) || !_isOnline)
-        {
+        while (((millis() - _lastSend) < _lastSendSpace) || !_isOnline) {
             // check for event messages from the device while
             // we wait
             loop();
@@ -324,36 +310,29 @@ private:
         // init our out args always
         *command = 0;
         *argument = 0;
-        
+
         // try to sync our reads to the packet start
-        do
-        {
+        do {
             // we use readBytes as it gives us the standard timeout
             read = _serial.readBytes(&(in[DfMp3_Packet_StartCode]), 1);
-            if (read != 1)
-            {
+            if (read != 1) {
                 // nothing read
                 return false;
             }
         } while (in[DfMp3_Packet_StartCode] != 0x7e);
 
         read += _serial.readBytes(in + 1, DfMp3_Packet_SIZE - 1);
-        if (read < DfMp3_Packet_SIZE)
-        {
+        if (read < DfMp3_Packet_SIZE) {
             // not enough bytes, corrupted packet
             return false;
         }
 
-        if (in[DfMp3_Packet_Version] != 0xFF ||
-            in[DfMp3_Packet_Length] != 0x06 ||
-            in[DfMp3_Packet_EndCode] != 0xef )
-        {
+        if (in[DfMp3_Packet_Version] != 0xFF || in[DfMp3_Packet_Length] != 0x06 || in[DfMp3_Packet_EndCode] != 0xef) {
             // invalid version or corrupted packet
             return false;
         }
 
-        if (!validateChecksum(in))
-        {
+        if (!validateChecksum(in)) {
             // checksum failed, corrupted paket
             return false;
         }
@@ -369,40 +348,31 @@ private:
         uint8_t replyCommand = 0;
         uint16_t replyArg = 0;
 
-        do
-        {
-            if (readPacket(&replyCommand, &replyArg))
-            {
-                if (command != 0 && command == replyCommand)
-                {
+        do {
+            if (readPacket(&replyCommand, &replyArg)) {
+                if (command != 0 && command == replyCommand) {
                     return replyArg;
-                }
-                else
-                {
-                    switch (replyCommand)
-                    {
+                } else {
+                    switch (replyCommand) {
                     case 0x3d:
                         T_NOTIFICATION_METHOD::OnPlayFinished(replyArg);
                         break;
 
                     case 0x3F:
-                        if (replyArg & 0x02)
-                        {
+                        if (replyArg & 0x02) {
                             _isOnline = true;
                             T_NOTIFICATION_METHOD::OnCardOnline(replyArg);
                         }
                         break;
 
                     case 0x3A:
-                        if (replyArg & 0x02)
-                        {
+                        if (replyArg & 0x02) {
                             T_NOTIFICATION_METHOD::OnCardInserted(replyArg);
                         }
                         break;
 
                     case 0x3B:
-                        if (replyArg & 0x02)
-                        {
+                        if (replyArg & 0x02) {
                             T_NOTIFICATION_METHOD::OnCardRemoved(replyArg);
                         }
                         break;
@@ -416,14 +386,10 @@ private:
                         break;
                     }
                 }
-            }
-            else
-            {
-                if (command != 0)
-                {
+            } else {
+                if (command != 0) {
                     T_NOTIFICATION_METHOD::OnError(DfMp3_Error_General);
-                    if (_serial.available() == 0)
-                    {
+                    if (_serial.available() == 0) {
                         return 0;
                     }
                 }
@@ -436,8 +402,7 @@ private:
     uint16_t calcChecksum(uint8_t* packet)
     {
         uint16_t sum = 0;
-        for (int i = DfMp3_Packet_Version; i < DfMp3_Packet_HiByteCheckSum; i++)
-        {
+        for (int i = DfMp3_Packet_Version; i < DfMp3_Packet_HiByteCheckSum; i++) {
             sum += packet[i];
         }
         return -sum;
@@ -454,6 +419,6 @@ private:
     bool validateChecksum(uint8_t* in)
     {
         uint16_t sum = calcChecksum(in);
-        return (sum == ((in[DfMp3_Packet_HiByteCheckSum] << 8) | in[DfMp3_Packet_LowByteCheckSum]));
+        return (sum == uint16_t((in[DfMp3_Packet_HiByteCheckSum] << 8) | in[DfMp3_Packet_LowByteCheckSum]));
     }
 };
